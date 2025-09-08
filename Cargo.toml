@@ -1,0 +1,10 @@
+[package]
+name = "supersimplescreenrecorder"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+windows-capture = "1.5.0"
+time = "0.1.12"
+egui = "0.27"
+eframe = "0.27"
