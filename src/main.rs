@@ -3,12 +3,12 @@ use std::time::Instant;
 
 use eframe::egui;
 
-use windows_capture::capture::{Context, GraphicsCaptureApiHandler};
+use windows_capture::capture::{CaptureControl, Context, GraphicsCaptureApiHandler};
 use windows_capture::encoder::{
     AudioSettingsBuilder, ContainerSettingsBuilder, VideoEncoder, VideoSettingsBuilder,
 };
 use windows_capture::frame::Frame;
-use windows_capture::graphics_capture_api::InternalCaptureControl;
+use windows_capture::graphics_capture_api::{InternalCaptureControl};
 use windows_capture::monitor::Monitor;
 use windows_capture::settings::{
     ColorFormat, CursorCaptureSettings, DirtyRegionSettings, DrawBorderSettings,
@@ -34,26 +34,19 @@ impl GraphicsCaptureApiHandler for Capture {
             "video.mp4",
         )?;
 
-        Ok(Self { encoder: Some(encoder), start: Instant::now() })
+        Ok(Self { encoder: Some(encoder), start: Instant::now()})
     }
 
     fn on_frame_arrived(
         &mut self,
         frame: &mut Frame,
-        capture_control: InternalCaptureControl,
+        _capture_control: InternalCaptureControl,
     ) -> Result<(), Self::Error> {
         print!("\rRecording for: {} seconds", self.start.elapsed().as_secs());
         io::stdout().flush()?;
 
         self.encoder.as_mut().unwrap().send_frame(frame)?;
 
-        if self.start.elapsed().as_secs() >= 6 {
-            self.encoder.take().unwrap().finish()?;
-
-            capture_control.stop();
-            
-            println!();
-        }
         Ok(())
     }
 
@@ -63,13 +56,14 @@ impl GraphicsCaptureApiHandler for Capture {
         Ok(())
     }
 }
+
 fn main() {
     let native_options = eframe::NativeOptions::default();
     eframe::run_native("Super Simple Screen Recorder", native_options, Box::new(|cc| Box::new(MyEguiApp::new(cc)))).expect("Failed to run app");
-   
 }
 
-fn record() {
+fn record() -> CaptureControl<Capture, Box<dyn std::error::Error + Send + Sync>>
+ {
     let primary_monitor = Monitor::primary().expect("There is no primary monitor");
     let settings = Settings::new(
         primary_monitor,
@@ -81,16 +75,17 @@ fn record() {
         ColorFormat::Rgba8,
         "Yea this works".to_string(),
     );
-
-    Capture::start(settings).expect("Screen capture failed");
+    
+    Capture::start_free_threaded(settings).expect("Screen capture failed")
 }
 
 #[derive(Default)]
-struct MyEguiApp {}
+struct MyEguiApp {
+    capture_control: Option<CaptureControl<Capture, Box<dyn std::error::Error + Send + Sync>>>,
+}
 
 impl MyEguiApp {
     fn new(cc: &eframe::CreationContext<'_>) -> Self {
-
         Self::default()
     }
 }
@@ -98,10 +93,18 @@ impl MyEguiApp {
 impl eframe::App for MyEguiApp {
    fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
        egui::CentralPanel::default().show(ctx, |ui| {
-           if ui.button("Start Recording").clicked() {
-            record();
-           };
            ui.heading("Hello World!");
+           let btn1 = ui.button("start");
+           let btn2 = ui.button("stop");
+
+            if btn1.clicked() {
+                self.capture_control = Some(record());
+            };
+            if btn2.clicked() {
+                if let Some(control) = self.capture_control.take() {
+                   control.stop().expect("Failed to stop recording");
+               }
+            }
         });
    }
 }
