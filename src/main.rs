@@ -58,8 +58,11 @@ impl GraphicsCaptureApiHandler for Capture {
 }
 
 fn main() {
-    let native_options = eframe::NativeOptions::default();
-    eframe::run_native("Super Simple Screen Recorder", native_options, Box::new(|cc| Box::new(MyEguiApp::new(cc)))).expect("Failed to run app");
+    let options = eframe::NativeOptions {
+        viewport: egui::ViewportBuilder::default().with_transparent(true),
+        ..Default::default()
+    };
+    eframe::run_native("Super Simple Screen Recorder", options, Box::new(|cc| Box::new(MyEguiApp::new(cc)))).expect("Failed to run app");
 }
 
 fn record() -> CaptureControl<Capture, Box<dyn std::error::Error + Send + Sync>>
@@ -92,19 +95,24 @@ impl MyEguiApp {
 
 impl eframe::App for MyEguiApp {
    fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
-       egui::CentralPanel::default().show(ctx, |ui| {
-           ui.heading("Hello World!");
-           let btn1 = ui.button("start");
-           let btn2 = ui.button("stop");
+       egui::CentralPanel::default().frame(egui::Frame::none()).show(ctx, |ui| {
+        ui.heading("Hello World!");
+        
+        let response = ui.add(egui::Slider::new(&mut 5, 0..=100));
+        response.on_hover_text("Im a slider!");
 
-            if btn1.clicked() {
-                self.capture_control = Some(record());
-            };
-            if btn2.clicked() {
-                if let Some(control) = self.capture_control.take() {
-                   control.stop().expect("Failed to stop recording");
-               }
+        let btn1 = ui.button("start");
+        let btn2 = ui.button("stop");
+
+        if btn1.clicked() {
+            self.capture_control = Some(record());
+        };
+
+        if btn2.clicked() {
+            if let Some(control) = self.capture_control.take() {
+                control.stop().expect("Failed to stop recording");
             }
-        });
+        }
+       });
    }
 }
